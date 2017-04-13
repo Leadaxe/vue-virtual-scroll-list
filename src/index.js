@@ -1,7 +1,8 @@
 import Vue from 'vue';
+import draggable from 'vuedraggable'
 
 const VirtualList = Vue.component('vue-virtual-scroll-list', {
-
+  components: {draggable},
 	props: {
 		size: {
 			type: Number,
@@ -15,6 +16,9 @@ const VirtualList = Vue.component('vue-virtual-scroll-list', {
 			type: String,
 			default: 'virtual-scroll-list'
 		},
+    items: {
+			type: Array
+		},
 		onScroll: Function
 	},
 
@@ -26,23 +30,37 @@ const VirtualList = Vue.component('vue-virtual-scroll-list', {
 		keeps: 0, // nums of item keeping in real dom
 		viewHeight: 0, // container wrapper viewport height
 		allPadding: 0, // all padding of not-render-yet doms
-		paddingTop: 0 // container wrapper real padding-top
+		paddingTop: 0, // container wrapper real padding-top
+	},
+
+	data () {
+    return {
+    	isDragded: false,
+			lastScrollTop: 0
+    }
 	},
 
 	methods: {
 		handleScroll (e) {
-			let scrollTop = this.$refs.container.scrollTop;
-
-			this.updateZone(scrollTop);
-
+			if (this.isDragded){
+				return;
+			}
+			this.countScrollTop();
 			if (this.onScroll) {
 				this.onScroll(e, scrollTop);
 			}
 		},
 
+		countScrollTop() {
+			let scrollTop = this.$refs.container.scrollTop;
+			this.lastScrollTop = scrollTop
+			this.updateZone(this.lastScrollTop);
+		},
+
 		updateZone (offset) {
 			let delta = this.$options.delta;
 			let overs = Math.floor(offset / this.size);
+			delta.keeps = this.remain + Math.round(this.remain / 2); //добавила дл€ того, чтобы динамически мен€лась высота
 
 			if (!offset) {
 				this.$emit('toTop');
@@ -68,6 +86,8 @@ const VirtualList = Vue.component('vue-virtual-scroll-list', {
 		},
 
 		filter (slots) {
+			if (!slots) slots = []
+
 			let delta = this.$options.delta;
 
 			delta.total = slots.length;
@@ -77,32 +97,92 @@ const VirtualList = Vue.component('vue-virtual-scroll-list', {
 			return slots.filter((slot, index) => {
 				return index >= delta.start && index <= delta.end;
 			});
-		}
+		},
+
+    unFilter (newItems) {
+      let delta = this.$options.delta;
+      let r = []
+			for(let index in this.items){
+      	let item = this.items[index]
+				if (index >= delta.start && index <= delta.end){
+          item = newItems[index - delta.start]
+        }
+				r.push(item)
+			}
+			return r
+    },
+
+		onDraggable (newItems) {
+      this.$emit('onDraggable', this.unFilter(newItems))
+    }
 	},
 
 	beforeMount () {
-		let remains = this.remain;
 		let delta = this.$options.delta;
-		let benchs = Math.round(remains / 2);
+		let benchs = Math.round(this.remain / 2);
 
-		delta.end = remains + benchs;
-		delta.keeps = remains + benchs;
-		delta.viewHeight = this.size * remains;
+		delta.end = this.remain + benchs;
+		delta.keeps = this.remain + benchs;
+		delta.viewHeight = this.size * this.remain; //динамически мен€ем высоту контейнера
 	},
+  mounted(){
+  //  this.countScrollTop();
+  },
+  unmounted(){
+    alert()
+  	//  this.countScrollTop();
+  },
 
+  //≈сли объект не уничтожалс€, то он будет прокручен к тому месту где он был на момент скрыти€
+  activated(){
+    this.$refs.container.scrollTop = this.lastScrollTop
+    this.updateZone(this.lastScrollTop)
+	},
 	render (createElement) {
 		let showList = this.filter(this.$slots.default);
-		let { viewHeight, paddingTop, allPadding } = this.$options.delta;
+		let { paddingTop, allPadding } = this.$options.delta;
+		let self = this
 
-		return createElement('div', {
+		// ¬с€ маги€ св€зки с draggable тут. при генерации € генерирую showList внутри draggable
+		let draggable = createElement('draggable',
+			{
+        'ref': 'draggable',
+				props: {
+					// ¬ажно чтобы в draggable попдали только те items, которые реально отображаютс€, иначе все ломаетс€
+					// дл€ этого € согласую items и сопоставленные им элементы showList, которые €вл€ютс€ вырезкой из слотов
+					value: self.filter(self.items),
+          options: {
+						// элемент, за который можно хватать
+            handle: '.drag_area',
+            animation: 150,
+					}
+				},
+        on: {
+					//  огда € отдаю отсортированные массив важно помнить, что это только вырезка из массива,
+					// которую мы отображаем, остальные элементы draggable не видит
+          input: self.onDraggable,
+					// ѕока работает draggable нельз€ крутить список, иначе у нас то что отображаетс€
+					// и что видит draggable рассинхронизуетс€, пока это не решаемый вопрос.
+          start() {
+          	self.isDragded = true
+          },
+          end() {
+          	self.isDragded = false
+            self.countScrollTop();
+          }
+        }
+			}, [showList]
+    )
+
+    return createElement('div', {
 			'ref': 'container',
 			'class': this.klass,
 			'style': {
 				'overflow-y': 'auto',
-				'height': viewHeight + 'px'
+				'height': this.size * this.remain + 'px'
 			},
 			'on': {
-				'scroll': this.handleScroll
+				'scroll': this.handleScroll,
 			}
 		}, [
 			createElement('div', {
@@ -110,8 +190,10 @@ const VirtualList = Vue.component('vue-virtual-scroll-list', {
 					'padding-top': paddingTop + 'px',
 					'padding-bottom': allPadding - paddingTop + 'px'
 				}
-			}, showList)
-		]);
+			}, [
+        draggable
+			])
+  	]);
 	}
 });
 
