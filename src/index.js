@@ -3,198 +3,204 @@ import draggable from 'vuedraggable'
 
 const VirtualList = Vue.component('vue-virtual-scroll-list', {
   components: {draggable},
-	props: {
-		size: {
-			type: Number,
-			required: true
-		},
-		remain: {
-			type: Number,
-			required: true
-		},
-		klass: {
-			type: String,
-			default: 'virtual-scroll-list'
-		},
+  props: {
+    size: {
+      type: Number,
+      required: true
+    },
+    remain: {
+      type: Number,
+      required: true
+    },
+    klass: {
+      type: String,
+      default: 'virtual-scroll-list'
+    },
     items: {
-			type: Array
-		},
-		onScroll: Function
-	},
+      type: Array
+    },
+    onScroll: Function,
 
-	// an object helping to calculate
-	delta: {
-		start: 0, // start index
-		end: 0, // end index
-		total: 0, // all items count
-		keeps: 0, // nums of item keeping in real dom
-		viewHeight: 0, // container wrapper viewport height
-		allPadding: 0, // all padding of not-render-yet doms
-		paddingTop: 0, // container wrapper real padding-top
-	},
-
-	data () {
-    return {
-    	isDragded: false,
-			lastScrollTop: 0
+    isDraggable:{
+      type: Boolean,
+      default: false
+    },
+    /**
+     * @see https://github.com/RubaXa/Sortable#options
+     */
+    draggableOptions: {
+      type: Object,
+      default: {}
     }
-	},
+  },
 
-	methods: {
-		handleScroll (e) {
-			if (this.isDragded){
-				return;
-			}
-			this.countScrollTop();
-			if (this.onScroll) {
-				this.onScroll(e, scrollTop);
-			}
-		},
+  // an object helping to calculate
+  delta: {
+    start: 0, // start index
+    end: 0, // end index
+    total: 0, // all items count
+    keeps: 0, // nums of item keeping in real dom
+    viewHeight: 0, // container wrapper viewport height
+    allPadding: 0, // all padding of not-render-yet doms
+    paddingTop: 0, // container wrapper real padding-top
+  },
 
-		countScrollTop() {
-			let scrollTop = this.$refs.container.scrollTop;
-			this.lastScrollTop = scrollTop
-			this.updateZone(this.lastScrollTop);
-		},
+  data () {
+    return {
+      isDragded: false,
+      lastScrollTop: 0
+    }
+  },
 
-		updateZone (offset) {
-			let delta = this.$options.delta;
-			let overs = Math.floor(offset / this.size);
-			delta.keeps = this.remain + Math.round(this.remain / 2); //äîáàâèëà äëÿ òîãî, ÷òîáû äèíàìè÷åñêè ìåíÿëàñü âûñîòà
+  methods: {
+    handleScroll (e) {
+      if (this.isDragded){
+        return;
+      }
+      this.countScrollTop();
+      if (this.onScroll) {
+        this.onScroll(e, scrollTop);
+      }
+    },
 
-			if (!offset) {
-				this.$emit('toTop');
-			}
+    countScrollTop() {
+      let scrollTop = this.$refs.container.scrollTop;
+      this.lastScrollTop = scrollTop
+      this.updateZone(this.lastScrollTop);
+    },
 
-			// need moving items at lease one unit height
-			// @todo: consider prolong the zone range size
-			let start = overs ? overs : 0;
-			let end = overs ? (overs + delta.keeps) : delta.keeps;
+    updateZone (offset) {
+      let delta = this.$options.delta;
+      let overs = Math.floor(offset / this.size);
+      delta.keeps = this.remain + Math.round(this.remain / 2); //Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ¸Ğ»Ğ° Ğ´Ğ»Ñ Ñ‚Ğ¾Ğ³Ğ¾, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ´Ğ¸Ğ½Ğ°Ğ¼Ğ¸Ñ‡ĞµÑĞºĞ¸ Ğ¼ĞµĞ½ÑĞ»Ğ°ÑÑŒ Ğ²Ñ‹ÑĞ¾Ñ‚Ğ°
 
-			// avoid overflow range
-			if (overs + this.remain >= delta.total) {
-				end = delta.total;
-				start = delta.total - delta.keeps;
-				this.$emit('toBottom');
-			}
+      if (!offset) {
+        this.$emit('toTop');
+      }
 
-			delta.end = end;
-			delta.start = start;
+      // need moving items at lease one unit height
+      // @todo: consider prolong the zone range size
+      let start = overs ? overs : 0;
+      let end = overs ? (overs + delta.keeps) : delta.keeps;
 
-			// call component to update items
-			this.$forceUpdate();
-		},
+      // avoid overflow range
+      if (overs + this.remain >= delta.total) {
+        end = delta.total;
+        start = delta.total - delta.keeps;
+        this.$emit('toBottom');
+      }
 
-		filter (slots) {
-			if (!slots) slots = []
+      delta.end = end;
+      delta.start = start;
 
-			let delta = this.$options.delta;
+      // call component to update items
+      this.$forceUpdate();
+    },
 
-			delta.total = slots.length;
-			delta.paddingTop = this.size * delta.start;
-			delta.allPadding = this.size * (slots.length - delta.keeps);
+    filter (slots) {
+      if (!slots) slots = []
 
-			return slots.filter((slot, index) => {
-				return index >= delta.start && index <= delta.end;
-			});
-		},
+      let delta = this.$options.delta;
+
+      delta.total = slots.length;
+      delta.paddingTop = this.size * delta.start;
+      delta.allPadding = this.size * (slots.length - delta.keeps);
+
+      return slots.filter((slot, index) => {
+        return index >= delta.start && index <= delta.end;
+      });
+    },
 
     unFilter (newItems) {
       let delta = this.$options.delta;
       let r = []
-			for(let index in this.items){
-      	let item = this.items[index]
-				if (index >= delta.start && index <= delta.end){
+      for(let index in this.items){
+        let item = this.items[index]
+        if (index >= delta.start && index <= delta.end){
           item = newItems[index - delta.start]
         }
-				r.push(item)
-			}
-			return r
+        r.push(item)
+      }
+      return r
     },
 
-		onDraggable (newItems) {
-      this.$emit('onDraggable', this.unFilter(newItems))
+    onDraggable (newItems) {
+      if (this.isDraggable) {
+        this.$emit('onDraggable', this.unFilter(newItems))
+      }
     }
-	},
-
-	beforeMount () {
-		let delta = this.$options.delta;
-		let benchs = Math.round(this.remain / 2);
-
-		delta.end = this.remain + benchs;
-		delta.keeps = this.remain + benchs;
-		delta.viewHeight = this.size * this.remain; //äèíàìè÷åñêè ìåíÿåì âûñîòó êîíòåéíåğà
-	},
-  mounted(){
-  //  this.countScrollTop();
-  },
-  unmounted(){
-    alert()
-  	//  this.countScrollTop();
   },
 
-  //Åñëè îáúåêò íå óíè÷òîæàëñÿ, òî îí áóäåò ïğîêğó÷åí ê òîìó ìåñòó ãäå îí áûë íà ìîìåíò ñêğûòèÿ
+  beforeMount () {
+    let delta = this.$options.delta;
+    let benchs = Math.round(this.remain / 2);
+
+    delta.end = this.remain + benchs;
+    delta.keeps = this.remain + benchs;
+    delta.viewHeight = this.size * this.remain; //Ğ´Ğ¸Ğ½Ğ°Ğ¼Ğ¸Ñ‡ĞµÑĞºĞ¸ Ğ¼ĞµĞ½ÑĞµĞ¼ Ğ²Ñ‹ÑĞ¾Ñ‚Ñƒ ĞºĞ¾Ğ½Ñ‚ĞµĞ¹Ğ½ĞµÑ€Ğ°
+  },
+  //Ğ•ÑĞ»Ğ¸ Ğ¾Ğ±ÑŠĞµĞºÑ‚ Ğ½Ğµ ÑƒĞ½Ğ¸Ñ‡Ñ‚Ğ¾Ğ¶Ğ°Ğ»ÑÑ, Ñ‚Ğ¾ Ğ¾Ğ½ Ğ±ÑƒĞ´ĞµÑ‚ Ğ¿Ñ€Ğ¾ĞºÑ€ÑƒÑ‡ĞµĞ½ Ğº Ñ‚Ğ¾Ğ¼Ñƒ Ğ¼ĞµÑÑ‚Ñƒ Ğ³Ğ´Ğµ Ğ¾Ğ½ Ğ±Ñ‹Ğ» Ğ½Ğ° Ğ¼Ğ¾Ğ¼ĞµĞ½Ñ‚ ÑĞºÑ€Ñ‹Ñ‚Ğ¸Ñ
   activated(){
     this.$refs.container.scrollTop = this.lastScrollTop
     this.updateZone(this.lastScrollTop)
-	},
-	render (createElement) {
-		let showList = this.filter(this.$slots.default);
-		let { paddingTop, allPadding } = this.$options.delta;
-		let self = this
+  },
 
-		// Âñÿ ìàãèÿ ñâÿçêè ñ draggable òóò. ïğè ãåíåğàöèè ÿ ãåíåğèğóş showList âíóòğè draggable
-		let draggable = createElement('draggable',
-			{
-        'ref': 'draggable',
-				props: {
-					// Âàæíî ÷òîáû â draggable ïîïäàëè òîëüêî òå items, êîòîğûå ğåàëüíî îòîáğàæàşòñÿ, èíà÷å âñå ëîìàåòñÿ
-					// äëÿ ıòîãî ÿ ñîãëàñóş items è ñîïîñòàâëåííûå èì ıëåìåíòû showList, êîòîğûå ÿâëÿşòñÿ âûğåçêîé èç ñëîòîâ
-					value: self.filter(self.items),
-          options: {
-						// ıëåìåíò, çà êîòîğûé ìîæíî õâàòàòü
-            handle: '.drag_area',
-            animation: 150,
-					}
-				},
-        on: {
-					// Êîãäà ÿ îòäàş îòñîğòèğîâàííûå ìàññèâ âàæíî ïîìíèòü, ÷òî ıòî òîëüêî âûğåçêà èç ìàññèâà,
-					// êîòîğóş ìû îòîáğàæàåì, îñòàëüíûå ıëåìåíòû draggable íå âèäèò
-          input: self.onDraggable,
-					// Ïîêà ğàáîòàåò draggable íåëüçÿ êğóòèòü ñïèñîê, èíà÷å ó íàñ òî ÷òî îòîáğàæàåòñÿ
-					// è ÷òî âèäèò draggable ğàññèíõğîíèçóåòñÿ, ïîêà ıòî íå ğåøàåìûé âîïğîñ.
-          start() {
-          	self.isDragded = true
+
+  render (createElement) {
+    let showList = this.filter(this.$slots.default);
+    let { paddingTop, allPadding } = this.$options.delta;
+    let self = this
+    let v_nodes = showList
+    if (this.isDraggable) {
+      // Ğ’ÑÑ Ğ¼Ğ°Ğ³Ğ¸Ñ ÑĞ²ÑĞ·ĞºĞ¸ Ñ draggable Ñ‚ÑƒÑ‚. Ğ¿Ñ€Ğ¸ Ğ³ĞµĞ½ĞµÑ€Ğ°Ñ†Ğ¸Ğ¸ Ñ Ğ³ĞµĞ½ĞµÑ€Ğ¸Ñ€ÑƒÑ showList Ğ²Ğ½ÑƒÑ‚Ñ€Ğ¸ draggable
+      v_nodes = createElement('draggable',
+        {
+          'ref': 'draggable',
+          props: {
+            // Ğ’Ğ°Ğ¶Ğ½Ğ¾ Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ² draggable Ğ¿Ğ¾Ğ¿Ğ´Ğ°Ğ»Ğ¸ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ñ‚Ğµ items, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ Ñ€ĞµĞ°Ğ»ÑŒĞ½Ğ¾ Ğ¾Ñ‚Ğ¾Ğ±Ñ€Ğ°Ğ¶Ğ°ÑÑ‚ÑÑ, Ğ¸Ğ½Ğ°Ñ‡Ğµ Ğ²ÑĞµ Ğ»Ğ¾Ğ¼Ğ°ĞµÑ‚ÑÑ
+            // Ğ´Ğ»Ñ ÑÑ‚Ğ¾Ğ³Ğ¾ Ñ ÑĞ¾Ğ³Ğ»Ğ°ÑÑƒÑ items Ğ¸ ÑĞ¾Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ñ‹Ğµ Ğ¸Ğ¼ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ñ‹ showList, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ ÑĞ²Ğ»ÑÑÑ‚ÑÑ Ğ²Ñ‹Ñ€ĞµĞ·ĞºĞ¾Ğ¹ Ğ¸Ğ· ÑĞ»Ğ¾Ñ‚Ğ¾Ğ²
+            value: self.filter(self.items),
+            options: self.draggableOptions,
           },
-          end() {
-          	self.isDragded = false
-            self.countScrollTop();
+          on: {
+            // ĞšĞ¾Ğ³Ğ´Ğ° Ñ Ğ¾Ñ‚Ğ´Ğ°Ñ Ğ¾Ñ‚ÑĞ¾Ñ€Ñ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¼Ğ°ÑÑĞ¸Ğ² Ğ²Ğ°Ğ¶Ğ½Ğ¾ Ğ¿Ğ¾Ğ¼Ğ½Ğ¸Ñ‚ÑŒ, Ñ‡Ñ‚Ğ¾ ÑÑ‚Ğ¾ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ²Ñ‹Ñ€ĞµĞ·ĞºĞ° Ğ¸Ğ· Ğ¼Ğ°ÑÑĞ¸Ğ²Ğ°,
+            // ĞºĞ¾Ñ‚Ğ¾Ñ€ÑƒÑ Ğ¼Ñ‹ Ğ¾Ñ‚Ğ¾Ğ±Ñ€Ğ°Ğ¶Ğ°ĞµĞ¼, Ğ¾ÑÑ‚Ğ°Ğ»ÑŒĞ½Ñ‹Ğµ ÑĞ»ĞµĞ¼ĞµĞ½Ñ‚Ñ‹ draggable Ğ½Ğµ Ğ²Ğ¸Ğ´Ğ¸Ñ‚
+            input: self.onDraggable,
+            // ĞŸĞ¾ĞºĞ° Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°ĞµÑ‚ draggable Ğ½ĞµĞ»ÑŒĞ·Ñ ĞºÑ€ÑƒÑ‚Ğ¸Ñ‚ÑŒ ÑĞ¿Ğ¸ÑĞ¾Ğº, Ğ¸Ğ½Ğ°Ñ‡Ğµ Ñƒ Ğ½Ğ°Ñ Ñ‚Ğ¾ Ñ‡Ñ‚Ğ¾ Ğ¾Ñ‚Ğ¾Ğ±Ñ€Ğ°Ğ¶Ğ°ĞµÑ‚ÑÑ
+            // Ğ¸ Ñ‡Ñ‚Ğ¾ Ğ²Ğ¸Ğ´Ğ¸Ñ‚ draggable Ñ€Ğ°ÑÑĞ¸Ğ½Ñ…Ñ€Ğ¾Ğ½Ğ¸Ğ·ÑƒĞµÑ‚ÑÑ, Ğ¿Ğ¾ĞºĞ° ÑÑ‚Ğ¾ Ğ½Ğµ Ñ€ĞµÑˆĞ°ĞµĞ¼Ñ‹Ğ¹ Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ.
+            start() {
+              self.isDragded = true
+            },
+            end() {
+              self.isDragded = false
+              self.countScrollTop();
+            }
           }
-        }
-			}, [showList]
-    )
+        }, [showList]
+      )
+    }
 
     return createElement('div', {
-			'ref': 'container',
-			'class': this.klass,
-			'style': {
-				'overflow-y': 'auto',
-				'height': this.size * this.remain + 'px'
-			},
-			'on': {
-				'scroll': this.handleScroll,
-			}
-		}, [
-			createElement('div', {
-				'style': {
-					'padding-top': paddingTop + 'px',
-					'padding-bottom': allPadding - paddingTop + 'px'
-				}
-			}, [
-        draggable
-			])
-  	]);
-	}
+      'ref': 'container',
+      'class': this.klass,
+      'style': {
+        'overflow-y': 'auto',
+        'height': this.size * this.remain + 'px'
+      },
+      'on': {
+        'scroll': this.handleScroll,
+      }
+    }, [
+      createElement('div', {
+        'style': {
+          'padding-top': paddingTop + 'px',
+          'padding-bottom': allPadding - paddingTop + 'px'
+        }
+      }, [
+        v_nodes
+      ])
+    ]);
+  }
 });
 
 module.exports = VirtualList;
